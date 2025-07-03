@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 from utils.summary_generator import generate_customer_summary
-from pages.insights_module import insights_page  # You should move the insights logic into insights_module.py
+from utils.insights_module import insights_page
 
 # --- Page Config ---
 st.set_page_config(page_title="Auto Insurance Retention Model", layout="wide")
@@ -14,24 +14,29 @@ encoders = joblib.load("models/label_encoders.pkl")
 # --- Load dataset ---
 df = pd.read_csv("data/Churn_full.csv")
 
-# --- Header with logo and title ---
-logo_col, title_col = st.columns([1, 4])
+# --- Header with logo and centered title ---
+logo_col, spacer, title_col, spacer2 = st.columns([1, 0.2, 4, 0.2])
 with logo_col:
     try:
-        st.image("images/logo.png", width=120)
+        st.image("images/logo.png", width=100)
     except:
         st.warning("⚠️ Logo not found in 'images/' directory.")
 with title_col:
-    st.markdown("<h1 style='margin-top: 20px;'>Auto Insurance Churn Predictor</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "<h1 style='text-align: center; color: #004080; margin-top: 15px;'>Auto Insurance Churn Predictor</h1>",
+        unsafe_allow_html=True,
+    )
 
-# --- Tab Layout ---
-tab1, tab2 = st.tabs(["Predict Churn", "Insights & Actionable Items"])
+# --- Tabs (No dropdown) ---
+tab1, tab2 = st.tabs(["🔍 Predict Churn", "📊 Insights & Actions"])
 
+# =====================
+# TAB 1: Predict Churn
+# =====================
 with tab1:
-    # --- Form Starts ---
+    st.markdown("<h3 style='text-align:center;'>📄 Customer & Policy Information</h3>", unsafe_allow_html=True)
+
     with st.form("churn_form"):
-        # 📄 Section 1: Customer & Policy Information
-        st.markdown("### 📄 Customer & Policy Information")
         col1, col2, col3 = st.columns(3)
         with col1:
             address_change_flag = st.selectbox("Address Change Flag", [0, 1])
@@ -48,8 +53,7 @@ with tab1:
         with col6:
             multi_policy = st.selectbox("Has Multi Policy", [0, 1])
 
-        # 💳 Section 2: Billing & Payment Details
-        st.markdown("### 💳 Billing & Payment Details")
+        st.markdown("<h3 style='text-align:center;'>💳 Billing & Payment Details</h3>", unsafe_allow_html=True)
         col7, col8, col9 = st.columns(3)
         with col7:
             loyalty_program = st.selectbox("Loyalty Program Enrollment", [0, 1])
@@ -66,8 +70,7 @@ with tab1:
         with col12:
             late_payments = st.number_input("Late Payment Count", min_value=0)
 
-        # 🛠️ Section 3: Claims & Risk Profile
-        st.markdown("### 🛠️ Claims & Risk Profile")
+        st.markdown("<h3 style='text-align:center;'>🛠️ Claims & Risk Profile</h3>", unsafe_allow_html=True)
         col13, col14, col15 = st.columns(3)
         with col13:
             auto_renew = st.selectbox("Auto Renew Enabled", [0, 1])
@@ -76,8 +79,7 @@ with tab1:
         with col15:
             fault_accidents = st.number_input("At-Fault Accident Count", min_value=0)
 
-        # 🧠 Section 4: Engagement & Sentiment Metrics
-        st.markdown("### 🧠 Engagement & Sentiment Metrics")
+        st.markdown("<h3 style='text-align:center;'>🧠 Engagement & Sentiment Metrics</h3>", unsafe_allow_html=True)
         col16, col17, col18 = st.columns(3)
         with col16:
             satisfaction_score = st.slider("Claim Satisfaction Score", 0, 100, 50)
@@ -92,10 +94,10 @@ with tab1:
         with col20:
             sentiment_score = st.slider("Sentiment Score", -1.0, 1.0, 0.0)
 
-        # --- Submit Button ---
-        submitted = st.form_submit_button("🔍 Predict Churn")
+        center_col = st.columns([4, 1, 4])[1]
+        with center_col:
+            submitted = st.form_submit_button("🔍 Predict Churn")
 
-    # --- Prediction Logic ---
     if submitted:
         input_dict = {
             "Address_Change_Flag": address_change_flag,
@@ -121,8 +123,6 @@ with tab1:
         }
 
         input_df = pd.DataFrame([input_dict])
-
-        # Encode categorical features
         for col in ['Coverage_Type', 'Billing_Method', 'Payment_Method']:
             encoder = encoders.get(col)
             if encoder:
@@ -131,18 +131,18 @@ with tab1:
                 except Exception as e:
                     st.error(f"Encoding error in column '{col}': {e}")
 
-        # Predict churn
         churn_score = model.predict_proba(input_df)[0][1]
         churn_percent = round(churn_score * 100, 2)
-
-        # Generate AI summary
-        summary = generate_customer_summary(input_dict)
 
         st.markdown(f"<h4 style='text-align: center;'>Predicted Churn Probability: <span style='color:#f63366'>{churn_percent}%</span></h4>", unsafe_allow_html=True)
         st.progress(int(churn_percent))
 
-        st.markdown("### 📜 Customer Summary")
+        summary = generate_customer_summary(input_dict)
+        st.markdown("<h4 style='text-align:center;'>📜 Customer Summary</h4>", unsafe_allow_html=True)
         st.info(summary)
 
+# =====================
+# TAB 2: Insights
+# =====================
 with tab2:
     insights_page()
