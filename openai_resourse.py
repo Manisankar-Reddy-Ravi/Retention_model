@@ -1,16 +1,13 @@
 from langchain_openai import AzureChatOpenAI  # type: ignore
 import os
-from dotenv import load_dotenv
+import streamlit as st
 
-# Load environment variables
-load_dotenv()
-
-# Azure OpenAI Configuration
-OPENAI_DEPLOYMENT_ENDPOINT = "https://advancedanalyticsopenaikey.openai.azure.com/"
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # ← updated
-OPENAI_API_VERSION = "2024-12-01-preview"
-OPENAI_DEPLOYMENT_NAME = "gpt-4o"
-OPENAI_MODEL_NAME = "gpt-4o"
+# Load API configuration
+OPENAI_DEPLOYMENT_ENDPOINT = st.secrets["AZURE_OPENAI_ENDPOINT"]
+OPENAI_API_KEY = st.secrets["AZURE_OPENAI_API_KEY"]
+OPENAI_API_VERSION = st.secrets["AZURE_OPENAI_API_VERSION"]
+OPENAI_DEPLOYMENT_NAME = st.secrets["AZURE_OPENAI_DEPLOYMENT_NAME"]
+OPENAI_MODEL_NAME = st.secrets.get("AZURE_OPENAI_MODEL_NAME", "gpt-4o")  # fallback to gpt-4o
 
 # Initialize Azure OpenAI Client
 llm = AzureChatOpenAI(
