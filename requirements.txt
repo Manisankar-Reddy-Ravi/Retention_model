@@ -8,4 +8,5 @@ shap
 matplotlib
 openai
 joblib
+seaborn
 dotenv
