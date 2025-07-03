@@ -8,3 +8,4 @@ shap
 matplotlib
 openai
 joblib
+dotenv
