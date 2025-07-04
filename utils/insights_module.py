@@ -27,7 +27,7 @@ def insights_page():
     st.markdown("<h3 style='text-align:center;'>📊 Business Insights & Customer Scenarios</h3>", unsafe_allow_html=True)
     st.write("Explore data-driven churn risk patterns and AI-generated customer insights.")
 
-    # CSS for uniform buttons
+    # Uniform button CSS
     st.markdown("""
         <style>
             div[data-testid="column"] > div > button {
@@ -54,12 +54,12 @@ def insights_page():
             st.session_state.show_top5 = False
 
     with col2:
-        if st.button("💳 Late Payments by State"):
+        if st.button("💳 Late Payment Insights"):
             st.session_state.scenario_selected = "late"
             st.session_state.show_top5 = False
 
     with col3:
-        if st.button("📈 Premium Increase > 5%"):
+        if st.button("📈 Premium Increase by five percent"):
             st.session_state.scenario_selected = "premium"
             st.session_state.show_top5 = False
 
@@ -90,7 +90,7 @@ def insights_page():
         elif selected == "premium":
             scenario_title = "Customers with Premium Increase > 5%"
             scenario_feature = "Premium_Change_Percent_Last_Renewal"
-            eda_plot_type = "premium_state"
+            eda_plot_type = "premium_line"
             filename_prefix = "premium_increase"
             scenario_data = df_insights[df_insights["Premium_Change_Percent_Last_Renewal"] > 5]
 
@@ -108,7 +108,7 @@ def insights_page():
             st.markdown(f"<h4 style='color:#0E1117; font-size:22px;'>🧾 <strong>{scenario_title}</strong></h4>", unsafe_allow_html=True)
             st.markdown(f"<p style='font-size:18px; font-weight:bold;'>Records found: <span style='color:#FA4B3E'>{len(scenario_data)}</span></p>", unsafe_allow_html=True)
 
-            # -------- EDA Plot --------
+            # ---- EDA Plot ----
             st.markdown("#### 📊 Exploratory Data Analysis")
             fig, ax = plt.subplots(figsize=(8, 4))
 
@@ -123,12 +123,13 @@ def insights_page():
                     ax.set_title("Total Late Payments by State")
                     ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
 
-            elif eda_plot_type == "premium_state":
-                sns.boxplot(data=scenario_data, x="State", y="Premium_Change_Percent_Last_Renewal", ax=ax)
-                ax.set_title("Premium Change % by State")
-                ax.set_ylabel("Premium Change (%)")
-                ax.set_xlabel("State")
-                ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+            elif eda_plot_type == "premium_line":
+                premium_counts = scenario_data["Premium_Change_Percent_Last_Renewal"].round().value_counts().sort_index()
+                ax.plot(premium_counts.index, premium_counts.values, marker='o', linestyle='-')
+                ax.set_title("Customers by Premium Increase (%)")
+                ax.set_xlabel("Premium Increase (%)")
+                ax.set_ylabel("Customer Count")
+                ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
             elif eda_plot_type == "claim_outcome":
                 sns.countplot(data=scenario_data, x="Claim_Outcome", order=["Approved", "Declined"], ax=ax)
@@ -136,7 +137,7 @@ def insights_page():
 
             st.pyplot(fig)
 
-            # -------- AI Summary --------
+            # ---- AI Summary ----
             st.markdown("#### 🧠 AI-Generated Summary")
             try:
                 row = scenario_data.head(1).to_dict(orient="records")[0]
@@ -166,7 +167,7 @@ def insights_page():
             except Exception as e:
                 st.warning(f"Summary generation failed: {e}")
 
-            # -------- Show Top 5 --------
+            # ---- Show Top 5 Customers ----
             if st.button("🎯 Show Top 5 Lowest Retention Customers"):
                 st.session_state.show_top5 = True
 
@@ -179,7 +180,9 @@ def insights_page():
                 st.markdown("#### 🥇 Top 5 Customers (Lowest Retention Probability)")
                 st.dataframe(top5[["Customer_ID", "Retention_Probability (%)", scenario_feature]])
 
-                csv_download = prediction_df[["Customer_ID", scenario_feature, "Retention_Probability (%)"]].sort_values("Retention_Probability (%)").to_csv(index=False).encode('utf-8')
+                # --- Updated Download Button with required columns ---
+                csv_columns = ["Customer_ID", scenario_feature, "Policy_Number", "Policy_Expiry_Date", "State", "Retention_Probability (%)"]
+                csv_download = prediction_df[csv_columns].sort_values("Retention_Probability (%)").to_csv(index=False).encode('utf-8')
                 st.markdown("#### 📥 Download All Scenario Records")
                 st.download_button("⬇️ Download CSV", data=csv_download, file_name=f"{filename_prefix}_customers.csv", mime="text/csv")
 
