@@ -1,20 +1,18 @@
-import streamlit as st 
+import streamlit as st
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import io
+from matplotlib.ticker import MaxNLocator
 import joblib
 from utils.summary_generator import generate_customer_summary_tab2
 
-# Load the data for insights
-df_insights = pd.read_csv("data/Churn_full.csv")
+# Load data and models
+df_insights = pd.read_csv("data/Churn_full_2.csv")
 df_insights["Policy_Expiry_Date"] = pd.to_datetime(df_insights["Policy_Expiry_Date"], errors='coerce')
-
-# Load model and encoders
+df_insights["Claim_Closed_Date"] = pd.to_datetime(df_insights.get("Claim_Closed_Date"), errors='coerce')
 model = joblib.load("models/xgb_model.pkl")
 encoders = joblib.load("models/label_encoders.pkl")
 
-# Apply encoding if necessary
 def encode_df(input_df):
     for col in ['Coverage_Type', 'Billing_Method', 'Payment_Method']:
         encoder = encoders.get(col)
@@ -26,108 +24,164 @@ def encode_df(input_df):
     return input_df
 
 def insights_page():
-    st.markdown("### 📊 Insights & Actionable Items")
-    st.write("Explore key scenarios and visualize important patterns contributing to customer churn.")
+    st.markdown("<h3 style='text-align:center;'>📊 Business Insights & Customer Scenarios</h3>", unsafe_allow_html=True)
+    st.write("Explore data-driven churn risk patterns and AI-generated customer insights.")
+
+    # CSS for uniform buttons
+    st.markdown("""
+        <style>
+            div[data-testid="column"] > div > button {
+                height: 60px !important;
+                width: 100% !important;
+                font-size: 15px !important;
+                font-weight: 600 !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
-
-    scenario_data = None
-    scenario_title = ""
-    scenario_feature = ""
+    scenario_data, scenario_title, scenario_feature, eda_plot_type, filename_prefix = None, "", "", "", ""
     today = pd.Timestamp.today()
 
-    # ---- BUTTON 1: Policy Expiry in Next 60 Days ----
+    if "scenario_selected" not in st.session_state:
+        st.session_state.scenario_selected = False
+    if "show_top5" not in st.session_state:
+        st.session_state.show_top5 = False
+
     with col1:
-        if st.button("📅 Imminent Policy Expirations", use_container_width=True):
-            scenario_title = "Customers with Policies Expiring in Next 60 Days"
-            scenario_feature = "Policy_Tenure_Months"
+        if st.button("📅 Policy Expiring in 90 Days"):
+            st.session_state.scenario_selected = "policy"
+            st.session_state.show_top5 = False
+
+    with col2:
+        if st.button("💳 Late Payments by State"):
+            st.session_state.scenario_selected = "late"
+            st.session_state.show_top5 = False
+
+    with col3:
+        if st.button("📈 Premium Increase > 5%"):
+            st.session_state.scenario_selected = "premium"
+            st.session_state.show_top5 = False
+
+    with col4:
+        if st.button("📂 Claims Closed in 90 Days"):
+            st.session_state.scenario_selected = "claims"
+            st.session_state.show_top5 = False
+
+    if st.session_state.scenario_selected:
+        selected = st.session_state.scenario_selected
+        if selected == "policy":
+            scenario_title = "Customers with Policies Expiring in Next 90 Days"
+            scenario_feature = "Coverage_Type"
+            eda_plot_type = "bar"
+            filename_prefix = "policy_expiring"
             scenario_data = df_insights[
                 (df_insights["Policy_Expiry_Date"] > today) &
-                (df_insights["Policy_Expiry_Date"] <= today + pd.Timedelta(days=60))
+                (df_insights["Policy_Expiry_Date"] <= today + pd.Timedelta(days=90))
             ]
 
-    # ---- BUTTON 2: Late Payments ----
-    with col2:
-        if st.button("💳 High Payment Delinquency", use_container_width=True):
+        elif selected == "late":
             scenario_title = "Customers with Late Payments"
             scenario_feature = "Late_Payment_Count"
+            eda_plot_type = "late_region"
+            filename_prefix = "late_payments"
             scenario_data = df_insights[df_insights["Late_Payment_Count"] > 0]
 
-    # ---- BUTTON 3: Premium Increased ----
-    with col3:
-        if st.button("📈 Significant Premium Increase", use_container_width=True):
+        elif selected == "premium":
             scenario_title = "Customers with Premium Increase > 5%"
             scenario_feature = "Premium_Change_Percent_Last_Renewal"
+            eda_plot_type = "premium_state"
+            filename_prefix = "premium_increase"
             scenario_data = df_insights[df_insights["Premium_Change_Percent_Last_Renewal"] > 5]
 
-    # ---- BUTTON 4: Claims Filed Recently ----
-    with col4:
-        if st.button("📂 Recent Claims Activity", use_container_width=True):
-            scenario_title = "Customers Who Filed Claims More Than Once"
-            scenario_feature = "Claims_Count_Lifetime"
-            scenario_data = df_insights[df_insights["Claims_Count_Lifetime"] > 1]
+        elif selected == "claims":
+            scenario_title = "Customers with Claims Closed in Last 90 Days"
+            scenario_feature = "Claim_Outcome"
+            eda_plot_type = "claim_outcome"
+            filename_prefix = "claims_closed"
+            scenario_data = df_insights[
+                (df_insights["Claim_Closed_Date"] >= today - pd.Timedelta(days=90)) &
+                (df_insights["Claim_Closed_Date"] <= today)
+            ]
 
-    # ---- Show Scenario Data, Plots, and Downloads ----
-    if scenario_data is not None and not scenario_data.empty:
-        st.markdown(f"#### {scenario_title}")
-        st.write(f"Records found: {len(scenario_data)}")
+        if scenario_data is not None and not scenario_data.empty:
+            st.markdown(f"<h4 style='color:#0E1117; font-size:22px;'>🧾 <strong>{scenario_title}</strong></h4>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:18px; font-weight:bold;'>Records found: <span style='color:#FA4B3E'>{len(scenario_data)}</span></p>", unsafe_allow_html=True)
 
-        # EDA Plot
-        fig, ax = plt.subplots(figsize=(8, 4))
-        if pd.api.types.is_numeric_dtype(scenario_data[scenario_feature]):
-            sns.histplot(scenario_data[scenario_feature], bins=20, kde=True, ax=ax)
-            ax.set_title(f"Distribution of {scenario_feature}")
-        else:
-            sns.countplot(y=scenario_data[scenario_feature], ax=ax)
-            ax.set_title(f"Counts of {scenario_feature}")
-        st.pyplot(fig)
+            # -------- EDA Plot --------
+            st.markdown("#### 📊 Exploratory Data Analysis")
+            fig, ax = plt.subplots(figsize=(8, 4))
 
-        # Prediction for scenario data
-        st.markdown("#### 🔍 Top 5 Customers with High Retention Probability")
-        try:
-            prediction_df = scenario_data.copy()
-            prediction_input = prediction_df[[
-                "Address_Change_Flag", "VIN_Validated", "Policy_Tenure_Months", "Coverage_Type",
-                "Deductibles", "Has_Multi_Policy", "Loyalty_Program_Enrollment", "Billing_Method",
-                "Payment_Method", "Discount_Count", "Premium_Change_Percent_Last_Renewal",
-                "Late_Payment_Count", "Auto_Renew_Enabled", "Claims_Count_Lifetime",
-                "At_Fault_Accident_Count", "Claim_Satisfaction_Score", "Interaction_Score", "NPS",
-                "Complaint_Count", "Sentiment_Score"
-            ]].copy()
-            prediction_input = encode_df(prediction_input)
-            churn_probs = model.predict_proba(prediction_input)[:, 1]
-            prediction_df['Retention_Probability (%)'] = (1 - churn_probs) * 100
-            top5 = prediction_df.sort_values('Retention_Probability (%)', ascending=False).head(5)
-            st.dataframe(top5[["Customer_ID", "Retention_Probability (%)", scenario_feature]])
+            if eda_plot_type == "bar":
+                sns.countplot(data=scenario_data, x=scenario_feature, ax=ax)
+                ax.set_title(f"{scenario_feature} Distribution")
 
-            # Download Button for retained customers in selected scenario
-            st.markdown("#### 📥 Download Retained Customers (Filtered by Scenario)")
-            full_encoded = encode_df(scenario_data.copy())
-            churn_probs_all = model.predict_proba(full_encoded[[
-                "Address_Change_Flag", "VIN_Validated", "Policy_Tenure_Months", "Coverage_Type",
-                "Deductibles", "Has_Multi_Policy", "Loyalty_Program_Enrollment", "Billing_Method",
-                "Payment_Method", "Discount_Count", "Premium_Change_Percent_Last_Renewal",
-                "Late_Payment_Count", "Auto_Renew_Enabled", "Claims_Count_Lifetime",
-                "At_Fault_Accident_Count", "Claim_Satisfaction_Score", "Interaction_Score", "NPS",
-                "Complaint_Count", "Sentiment_Score"
-            ]])
-            full_encoded['Retention_Probability (%)'] = (1 - churn_probs_all[:, 1]) * 100
-            retained_final = full_encoded[full_encoded['Retention_Probability (%)'] > 50]
-            csv_download = retained_final.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Retained Customers CSV", data=csv_download,
-                               file_name="retained_customers_filtered.csv", mime="text/csv")
+            elif eda_plot_type == "late_region":
+                if "State" in scenario_data.columns:
+                    region_late = scenario_data.groupby("State")["Late_Payment_Count"].sum().reset_index()
+                    sns.barplot(data=region_late, x="State", y="Late_Payment_Count", ax=ax)
+                    ax.set_title("Total Late Payments by State")
+                    ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
 
-        except Exception as e:
-            st.error(f"Error during prediction: {e}")
+            elif eda_plot_type == "premium_state":
+                sns.boxplot(data=scenario_data, x="State", y="Premium_Change_Percent_Last_Renewal", ax=ax)
+                ax.set_title("Premium Change % by State")
+                ax.set_ylabel("Premium Change (%)")
+                ax.set_xlabel("State")
+                ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
 
-        # Summary using LLM
-        st.markdown("#### 🧠 AI Summary")
-        if st.button("Generate Summary for This Scenario"):
+            elif eda_plot_type == "claim_outcome":
+                sns.countplot(data=scenario_data, x="Claim_Outcome", order=["Approved", "Declined"], ax=ax)
+                ax.set_title("Claim Outcome: Approved vs Declined")
+
+            st.pyplot(fig)
+
+            # -------- AI Summary --------
+            st.markdown("#### 🧠 AI-Generated Summary")
             try:
-                first_row = scenario_data.head(1).to_dict(orient="records")[0]
-                summary = generate_customer_summary_tab2(first_row)
-                st.info(summary)
+                row = scenario_data.head(1).to_dict(orient="records")[0]
+                total_count = len(df_insights)
+                scenario_count = len(scenario_data)
+                percentage = round((scenario_count / total_count) * 100, 2)
+
+                prediction_input = encode_df(scenario_data[[ 
+                    "Address_Change_Flag", "VIN_Validated", "Policy_Tenure_Months", "Coverage_Type",
+                    "Deductibles", "Has_Multi_Policy", "Loyalty_Program_Enrollment", "Billing_Method",
+                    "Payment_Method", "Discount_Count", "Premium_Change_Percent_Last_Renewal",
+                    "Late_Payment_Count", "Auto_Renew_Enabled", "Claims_Count_Lifetime",
+                    "At_Fault_Accident_Count", "Claim_Satisfaction_Score", "Interaction_Score", "NPS",
+                    "Complaint_Count", "Sentiment_Score"
+                ]])
+                churn_probs = model.predict_proba(prediction_input)[:, 1]
+                avg_retention = round((1 - churn_probs.mean()) * 100, 2)
+
+                stats = {
+                    "count": scenario_count,
+                    "percentage": percentage,
+                    "avg_retention": avg_retention
+                }
+
+                summary = generate_customer_summary_tab2(row, scenario_title, stats)
+                st.markdown(f"<div style='font-size:15px; font-weight:400;'>{summary}</div>", unsafe_allow_html=True)
             except Exception as e:
                 st.warning(f"Summary generation failed: {e}")
-    elif scenario_data is not None:
-        st.warning("No data available for selected scenario.")
+
+            # -------- Show Top 5 --------
+            if st.button("🎯 Show Top 5 Lowest Retention Customers"):
+                st.session_state.show_top5 = True
+
+            if st.session_state.show_top5:
+                st.markdown("#### 🧮 Predicted Retention Probabilities")
+                prediction_df = scenario_data.copy()
+                prediction_df['Retention_Probability (%)'] = (1 - churn_probs) * 100
+
+                top5 = prediction_df.sort_values('Retention_Probability (%)').head(5)
+                st.markdown("#### 🥇 Top 5 Customers (Lowest Retention Probability)")
+                st.dataframe(top5[["Customer_ID", "Retention_Probability (%)", scenario_feature]])
+
+                csv_download = prediction_df[["Customer_ID", scenario_feature, "Retention_Probability (%)"]].sort_values("Retention_Probability (%)").to_csv(index=False).encode('utf-8')
+                st.markdown("#### 📥 Download All Scenario Records")
+                st.download_button("⬇️ Download CSV", data=csv_download, file_name=f"{filename_prefix}_customers.csv", mime="text/csv")
+
+        else:
+            st.warning("⚠️ No data available for the selected scenario.")

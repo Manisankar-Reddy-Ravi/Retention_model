@@ -1,15 +1,26 @@
-from langchain_openai import AzureChatOpenAI  # type: ignore
-import os
+from langchain_openai import AzureChatOpenAI
 import streamlit as st
+import os
 
-# Load API configuration
-OPENAI_DEPLOYMENT_ENDPOINT = st.secrets["AZURE_OPENAI_ENDPOINT"]
-OPENAI_API_KEY = st.secrets["AZURE_OPENAI_API_KEY"]
-OPENAI_API_VERSION = st.secrets["AZURE_OPENAI_API_VERSION"]
-OPENAI_DEPLOYMENT_NAME = st.secrets["AZURE_OPENAI_DEPLOYMENT_NAME"]
-OPENAI_MODEL_NAME = st.secrets.get("AZURE_OPENAI_MODEL_NAME", "gpt-4o")  # fallback to gpt-4o
+# Try to load from Streamlit secrets first (for Streamlit Cloud)
+try:
+    OPENAI_DEPLOYMENT_ENDPOINT = st.secrets["AZURE_OPENAI_ENDPOINT"]
+    OPENAI_API_KEY = st.secrets["AZURE_OPENAI_API_KEY"]
+    OPENAI_API_VERSION = st.secrets["AZURE_OPENAI_API_VERSION"]
+    OPENAI_DEPLOYMENT_NAME = st.secrets["AZURE_OPENAI_DEPLOYMENT_NAME"]
+    OPENAI_MODEL_NAME = st.secrets["AZURE_OPENAI_MODEL_NAME"]
+except Exception:
+    # Fallback to local .env (for local development)
+    from dotenv import load_dotenv
+    load_dotenv()
 
-# Initialize Azure OpenAI Client
+    OPENAI_DEPLOYMENT_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+    OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+    OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
+    OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+    OPENAI_MODEL_NAME = os.getenv("AZURE_OPENAI_MODEL_NAME")
+
+# Initialize AzureChatOpenAI
 llm = AzureChatOpenAI(
     temperature=0.1,
     deployment_name=OPENAI_DEPLOYMENT_NAME,

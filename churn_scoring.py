@@ -8,7 +8,8 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import roc_auc_score
 
 # 📥 Step 1: Load data
-df = pd.read_csv("Churn_time.csv")
+df = pd.read_csv("data/Churn_1.csv")    # NEW
+
 
 # 🎯 Step 2: Define features and target
 target = "Churned"
