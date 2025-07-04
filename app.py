@@ -4,10 +4,10 @@ import joblib
 from utils.summary_generator import generate_customer_summary
 from utils.insights_module import insights_page
 
-# Page Configuration
+# --- Page Configuration ---
 st.set_page_config(page_title="Auto Insurance Churn Predictor", layout="centered")
 
-# Custom CSS Styling
+# --- CSS Styling ---
 st.markdown("""
     <style>
     .block-container {
@@ -15,9 +15,22 @@ st.markdown("""
         padding-bottom: 2rem;
     }
 
-    h1, h2, h3 {
+    h1 {
         font-weight: 700;
-        margin-bottom: 0.6rem;
+        font-size: 2rem;
+        margin-bottom: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    h2, h3 {
+        font-weight: 700;
+        margin-top: 2.2rem;
+        margin-bottom: 1rem;
+    }
+
+    .form-section {
+        margin-bottom: 3rem;  /* adds space after each section */
+        padding-top: 0.5rem;
     }
 
     .stButton>button {
@@ -26,46 +39,37 @@ st.markdown("""
         border-radius: 8px !important;
         padding: 0.5rem 2rem;
         font-weight: 600 !important;
-        font-size: 16px !important;
+        font-size: 18px !important;
         margin-top: 10px;
-    }
-
-    .form-section {
-        margin-bottom: 2rem;
-        padding-top: 1rem;
     }
 
     footer {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# Load model and encoders
+# --- Load model, encoder, and data ---
 model = joblib.load("models/xgb_model.pkl")
 encoders = joblib.load("models/label_encoders.pkl")
-
-# Load data
 df = pd.read_csv("data/Churn_full_2.csv")
 
-# --- Logo and Title Alignment
-logo_col, title_col = st.columns([1, 6])
-with logo_col:
-    try:
-        st.image("images/logo.png", width=100)
-    except:
-        st.warning("⚠️ Logo not found.")
-with title_col:
+# --- Header Layout: Logo + Title ---
+col1, col2 = st.columns([0.25, 0.75])
+with col1:
+    st.image("images/logo.png", width=120)  # Adjusted width to keep in one line
+with col2:
     st.markdown(
-        "<h1 style='padding-top: 1.2rem; color: #004080;'>Auto Insurance Churn Predictor</h1>",
+        "<h1 style='color:#004080; padding-top: 1.3rem; font-size: 1.9rem;'>Auto Insurance Churn Predictor</h1>",
         unsafe_allow_html=True
     )
 
-# --- Tabs
+# --- Tabs ---
 tab1, tab2 = st.tabs(["🔍 Predict Churn", "📊 Insights & Actions"])
 
 # -------------------- TAB 1 -------------------- #
 with tab1:
-    st.markdown("<h3>📄 Customer & Policy Information</h3>", unsafe_allow_html=True)
     st.markdown('<div class="form-section">', unsafe_allow_html=True)
+    st.markdown("<h3>📄 Customer & Policy Information</h3>", unsafe_allow_html=True)
+    
 
     with st.form("churn_form"):
         col1, col2, col3 = st.columns(3)
@@ -94,7 +98,6 @@ with tab1:
         with col9:
             payment_display = st.selectbox("Payment Method", ["Card", "Bank"])
             payment_method = "ACH" if payment_display == "Bank" else "Card"
-
 
         col10, col11, col12 = st.columns(3)
         with col10:
@@ -130,13 +133,15 @@ with tab1:
         with col20:
             nps = st.number_input("Net Promoter Score (NPS)", min_value=0, max_value=10)
 
-        # Submit Button in Center
         st.markdown("</div>", unsafe_allow_html=True)
-        center_col = st.columns([4, 1, 4])[1]
-        with center_col:
-            submitted = st.form_submit_button("Submit")
 
-    # On Form Submission
+        center_col = st.columns([3, 2, 3])[1]
+
+        with center_col:
+            submitted = st.form_submit_button("Submit", use_container_width=True)
+
+
+    # ----- On Submit -----
     if submitted:
         input_dict = {
             "Address_Change_Flag": address_change_flag,
@@ -172,40 +177,30 @@ with tab1:
 
         churn_score = model.predict_proba(input_df)[0][1]
         churn_percent = churn_score * 100
-        churn_progress = int(churn_percent)
 
         st.markdown("### 📊 Model Results")
 
-        # Progress Bar with Risk Levels
-        import streamlit.components.v1 as components
-
-        churn_percentage = float(round(churn_score * 100, 2))
-
-        # Determine risk level
-        if churn_percentage >= 80:
+        # --- Colored Churn Probability Bar ---
+        if churn_percent >= 80:
             risk_level = "High"
-            color = "#e63946"   # Red
-        elif churn_percentage >= 40:
+            color = "#e63946"
+        elif churn_percent >= 40:
             risk_level = "Medium"
-            color = "#f4a261"   # Orange
+            color = "#f4a261"
         else:
             risk_level = "Low"
-            color = "#2a9d8f"   # Green
+            color = "#2a9d8f"
 
-        # Render colored progress bar using HTML + CSS
         st.markdown(f"""
         <div style="margin-top: 10px;">
-        <div style="font-weight: 600;">Churn Probability: {churn_percentage:.2f}%</div>
-        <div style="height: 24px; width: 100%; background-color: #e0e0e0; border-radius: 8px; overflow: hidden;">
-            <div style="height: 100%; width: {churn_percentage}%; background-color: {color}; text-align: center; line-height: 24px; color: white; font-weight: bold;">
-            {risk_level}
+            <div style="font-weight: 600;">Churn Probability: {churn_percent:.2f}%</div>
+            <div style="height: 24px; width: 100%; background-color: #e0e0e0; border-radius: 8px; overflow: hidden;">
+                <div style="height: 100%; width: {churn_percent}%; background-color: {color}; text-align: center; line-height: 24px; color: white; font-weight: bold;">
+                    {risk_level}
+                </div>
             </div>
         </div>
-        </div>
         """, unsafe_allow_html=True)
-
-        st.progress(churn_progress)
-
 
         if churn_percent >= 80:
             st.error("🚨 High Risk of Churn")
@@ -214,7 +209,7 @@ with tab1:
         else:
             st.success("✅ Low Risk of Churn")
 
-        # Summary
+        # --- Summary ---
         summary = generate_customer_summary(input_dict)
         st.markdown("<h4 style='text-align:left;'>📜 Customer Summary</h4>", unsafe_allow_html=True)
         st.write(summary)

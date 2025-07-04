@@ -24,8 +24,8 @@ def encode_df(input_df):
     return input_df
 
 def insights_page():
-    st.markdown("<h3 style='text-align:center;'>📊 Business Insights & Customer Scenarios</h3>", unsafe_allow_html=True)
-    st.write("Explore data-driven churn risk patterns and AI-generated customer insights.")
+    st.markdown("<h3 style='text-align:left;'>📊 Business Insights & Customer Scenarios</h3>", unsafe_allow_html=True)
+    st.write("Explore key scenarios and visualize important patterns contributing to customer churn")
 
     # Uniform button CSS
     st.markdown("""
